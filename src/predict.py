@@ -5,6 +5,9 @@ repository, with some modifications to make it work with the RP platform.
 """
 
 import gc
+import json
+
+import torch
 import threading
 from concurrent.futures import (
     ThreadPoolExecutor,
@@ -14,20 +17,21 @@ import numpy as np
 from runpod.serverless.utils import rp_cuda
 
 from faster_whisper import WhisperModel
-from faster_whisper.utils import format_timestamp
 
 # Define available models (for validation)
 AVAILABLE_MODELS = {
-    "tiny",
-    "base",
+    # "tiny",
+    # "base",
     "small",
-    "medium",
-    "large-v1",
-    "large-v2",
+    # "medium",
+    # "large-v1",
+    # "large-v2",
     "large-v3",
     "turbo",
 }
 
+is_cuda_available = torch.cuda.is_available()
+device = "cuda" if is_cuda_available else "cpu"
 
 class Predictor:
     """A Predictor class for the Whisper model with lazy loading"""
@@ -46,7 +50,8 @@ class Predictor:
     def predict(
         self,
         audio,
-        model_name="base",
+        model_name="small",
+        compute_type="float16" if is_cuda_available else "int8",
         language=None,
         temperature=0,
         best_of=5,
@@ -83,7 +88,7 @@ class Predictor:
                     self.models.clear()
                     # Hint Python to release memory
                     gc.collect()
-                    if rp_cuda.is_available():
+                    if is_cuda_available:
                         # If using PyTorch models, you might call torch.cuda.empty_cache()
                         # FasterWhisper uses CTranslate2; explicit cache clearing might not be needed
                         # but gc.collect() is generally helpful.
@@ -95,8 +100,8 @@ class Predictor:
                 try:
                     loaded_model = WhisperModel(
                         model_name,
-                        device="cuda" if rp_cuda.is_available() else "cpu",
-                        compute_type="float16" if rp_cuda.is_available() else "int8",
+                        device=device,
+                        compute_type=compute_type,
                     )
                     self.models[model_name] = loaded_model
                     model = loaded_model
@@ -159,7 +164,8 @@ class Predictor:
         results = {
             "segments": serialize_segments(segments),
             "language": info.language,
-            "device": "cuda" if rp_cuda.is_available() else "cpu",
+            "detected_language": info.language,
+            "device": device,
             "model": model_name,
         }
 
@@ -172,9 +178,10 @@ class Predictor:
                             "word": word.word,
                             "start": word.start,
                             "end": word.end,
+                            "score": word.probability,
                         }
                     )
-            results["word_timestamps"] = word_timestamps_list
+            results["word_segments"] = word_timestamps_list
 
         return results
 
@@ -186,63 +193,9 @@ def serialize_segments(transcript):
     return [
         {
             "id": segment.id,
-            "seek": segment.seek,
             "start": segment.start,
             "end": segment.end,
             "text": segment.text,
-            "tokens": segment.tokens,
-            "temperature": segment.temperature,
-            "avg_logprob": segment.avg_logprob,
-            "compression_ratio": segment.compression_ratio,
-            "no_speech_prob": segment.no_speech_prob,
         }
         for segment in transcript
     ]
-
-
-def format_segments(format_type, segments):
-    """
-    Format the segments to the desired format
-    """
-
-    if format_type == "plain_text":
-        return " ".join([segment.text.lstrip() for segment in segments])
-    elif format_type == "formatted_text":
-        return "\n".join([segment.text.lstrip() for segment in segments])
-    elif format_type == "srt":
-        return write_srt(segments)
-    elif format_type == "vtt":  # Added VTT case
-        return write_vtt(segments)
-    else:  # Default or unknown format
-        return segments
-
-
-def write_vtt(transcript):
-    """
-    Write the transcript in VTT format.
-    """
-    result = ""
-
-    for segment in transcript:
-        # Using the consistent timestamp format from previous PR
-        result += f"{format_timestamp(segment.start, always_include_hours=True)} --> {format_timestamp(segment.end, always_include_hours=True)}\n"
-        result += f"{segment.text.strip().replace('-->', '->')}\n"
-        result += "\n"
-
-    return result
-
-
-def write_srt(transcript):
-    """
-    Write the transcript in SRT format.
-    """
-    result = ""
-
-    for i, segment in enumerate(transcript, start=1):
-        result += f"{i}\n"
-        result += f"{format_timestamp(segment.start, always_include_hours=True, decimal_marker=',')} --> "
-        result += f"{format_timestamp(segment.end, always_include_hours=True, decimal_marker=',')}\n"
-        result += f"{segment.text.strip().replace('-->', '->')}\n"
-        result += "\n"
-
-    return result
