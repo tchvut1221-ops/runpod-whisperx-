@@ -48,6 +48,7 @@ def run_whisper_job(job):
     global audio_input
     job_input = job['input']
 
+    audio_base64 = job_input.pop("audio_base64", False)
     print(job_input)
     input_validation = validate(job_input, INPUT_VALIDATIONS)
 
@@ -55,18 +56,18 @@ def run_whisper_job(job):
         return {"error": input_validation['errors']}
     job_input = input_validation['validated_input']
 
-    if not job_input.get('audio', False) and not job_input.get('audio_base64', False):
+    if not job_input.get('audio', False) and not audio_base64:
         return {'error': 'Must provide either audio or audio_base64'}
 
-    if job_input.get('audio', False) and job_input.get('audio_base64', False):
+    if job_input.get('audio', False) and audio_base64:
         return {'error': 'Must provide either audio or audio_base64, not both'}
 
     if job_input.get('audio', False):
         rp_download.HEADERS = job_input.get("download_headers", rp_download.HEADERS)
         audio_input = download_files_from_urls(job['id'], [job_input['audio']])[0]
 
-    if job_input.get('audio_base64', False):
-        audio_input = base64_to_tempfile(job_input['audio_base64'])
+    if audio_base64:
+        audio_input = base64_to_tempfile(audio_base64)
 
     whisper_results = MODEL.predict(
         audio=audio_input,
