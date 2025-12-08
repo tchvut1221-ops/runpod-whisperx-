@@ -9,7 +9,7 @@ import base64
 import tempfile
 
 from rp_schema import INPUT_VALIDATIONS
-from runpod.serverless.utils import download_files_from_urls, rp_cleanup, rp_debugger
+from runpod.serverless.utils import download_files_from_urls, rp_cleanup, rp_debugger, rp_download
 from runpod.serverless.utils.rp_validator import validate
 import runpod
 import predict
@@ -63,6 +63,7 @@ def run_whisper_job(job):
 
     if job_input.get('audio', False):
         with rp_debugger.LineTimer('download_step'):
+            rp_download.HEADERS = job_input.get("download_headers", rp_download.HEADERS)
             audio_input = download_files_from_urls(job['id'], [job_input['audio']])[0]
 
     if job_input.get('audio_base64', False):
@@ -72,9 +73,6 @@ def run_whisper_job(job):
         whisper_results = MODEL.predict(
             audio=audio_input,
             model_name=job_input["model"],
-            transcription=job_input["transcription"],
-            translation=job_input["translation"],
-            translate=job_input["translate"],
             language=job_input["language"],
             temperature=job_input["temperature"],
             best_of=job_input["best_of"],

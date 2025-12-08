@@ -9,25 +9,15 @@ INPUT_VALIDATIONS = {
         'required': False,
         'default': None
     },
+    'download_headers': {
+        'type': dict,
+        'required': False,
+        'default': None
+    },
     'model': {
         'type': str,
         'required': False,
         'default': 'base'
-    },
-    'transcription': {
-        'type': str,
-        'required': False,
-        'default': 'plain_text'
-    },
-    'translate': {
-        'type': bool,
-        'required': False,
-        'default': False
-    },
-    'translation': {
-        'type': str,
-        'required': False,
-        'default': 'plain_text'
     },
     'language': {
         'type': str,
@@ -97,11 +87,11 @@ INPUT_VALIDATIONS = {
     'enable_vad': {
         'type': bool,
         'required': False,
-        'default': False
+        'default': True
     },
     'word_timestamps': {
         'type': bool,
         'required': False,
-        'default': False
+        'default': True
     },
 }

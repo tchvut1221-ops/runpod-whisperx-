@@ -46,5 +46,7 @@ RUN python /fetch_models.py && \
 # Copy handler and other code
 COPY src .
 
+ENV TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=True
+
 # Set default command
 CMD python -u /rp_handler.py

@@ -47,9 +47,6 @@ class Predictor:
         self,
         audio,
         model_name="base",
-        transcription="plain_text",
-        translate=False,
-        translation="plain_text",  # Added in a previous PR
         language=None,
         temperature=0,
         best_of=5,
@@ -159,26 +156,9 @@ class Predictor:
 
         segments = list(segments)
 
-        # Format transcription
-        transcription_output = format_segments(transcription, segments)
-
-        # Handle translation if requested
-        translation_output = None
-        if translate:
-            translation_segments, _ = model.transcribe(
-                str(audio),
-                task="translate",
-                temperature=temperature,  # Reuse temperature settings for translation
-            )
-            translation_output = format_segments(
-                translation, list(translation_segments)
-            )
-
         results = {
             "segments": serialize_segments(segments),
-            "detected_language": info.language,
-            "transcription": transcription_output,
-            "translation": translation_output,
+            "language": info.language,
             "device": "cuda" if rp_cuda.is_available() else "cpu",
             "model": model_name,
         }
@@ -234,8 +214,7 @@ def format_segments(format_type, segments):
     elif format_type == "vtt":  # Added VTT case
         return write_vtt(segments)
     else:  # Default or unknown format
-        print(f"Warning: Unknown format '{format_type}', defaulting to plain text.")
-        return " ".join([segment.text.lstrip() for segment in segments])
+        return segments
 
 
 def write_vtt(transcript):
