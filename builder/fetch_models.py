@@ -1,15 +1,15 @@
 from faster_whisper.utils import download_model
 
 model_names = [
-    "tiny",
-    "base",
+    # "tiny",
+    # "base",
     "small",
-    "medium",
-    "large-v1",
-    "large-v2",
+    # "medium",
+    # "large-v1",
+    # "large-v2",
     "large-v3",
-    "distil-large-v2",
-    "distil-large-v3",
+    # "distil-large-v2",
+    # "distil-large-v3",
     "turbo",
 ]
 
