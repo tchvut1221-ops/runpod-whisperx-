@@ -1,166 +1,101 @@
-# at top of rp_handler.py (or speaker_processing.py)
-from dotenv import load_dotenv, find_dotenv
-import os
+"""
+rp_handler.py for runpod worker
 
-# find and load your .env file
-load_dotenv(find_dotenv())
-HF_TOKEN = os.getenv("HF_TOKEN")# 
+rp_debugger:
+- Utility that provides additional debugging information.
+The handler must be called with --rp_debugger flag to enable it.
+"""
+import base64
+import tempfile
 
-
-######SETTING HF_TOKENT#############
-
-import logging
-from huggingface_hub import login, whoami
-import torch
-import numpy as np
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-from speechbrain.pretrained import EncoderClassifier # type: ignore
-
-def spk_embed(wave_16k_mono: np.ndarray) -> np.ndarray:
-    wav = torch.tensor(wave_16k_mono).unsqueeze(0).to(device)
-    return ecapa.encode_batch(wav).squeeze(0).cpu().numpy()
-
-def to_numpy(x):
-    return x.detach().cpu().numpy() if isinstance(x, torch.Tensor) else np.asarray(x)
-
-# Set up logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# Grab the HF_TOKEN from environment
-raw_token = os.environ.get("HF_TOKEN", "")
-hf_token = raw_token.strip()
-
-if not hf_token.startswith("hf_"):
-    print(f"Token malformed or missing 'hf_' prefix. Forcing correction...")
-    hf_token = "h" + hf_token  # Force adding the 'h' (temporary fix)
-
-#print(f" Final HF_TOKEN used: #{hf_token}")
-if hf_token:
-    try:
-        logger.debug(f"HF_TOKEN Loaded: {repr(hf_token[:10])}...")  # Show only start of token for security
-        login(token=hf_token, add_to_git_credential=False)  # Safe for container runs
-        user = whoami(token=hf_token)
-        logger.info(f"Hugging Face Authenticated as: {user['name']}")
-    except Exception as e:
-        logger.error(" Failed to authenticate with Hugging Face", exc_info=True)
-else:
-    logger.warning("No Hugging Face token found in HF_TOKEN environment variable.")
-##############
-
-import shutil
-import runpod
-from runpod.serverless.utils.rp_validator import validate
-from runpod.serverless.utils import download_files_from_urls, rp_cleanup
 from rp_schema import INPUT_VALIDATIONS
-from predict import Predictor
-import os
-import logging
-import sys
-# Create a custom logger
-logger = logging.getLogger("rp_handler")
-logger.setLevel(logging.DEBUG)  # capture everything at DEBUG or above
-
-# Create console handler and set level to DEBUG
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_formatter = logging.Formatter(
-    "%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-)
-console_handler.setFormatter(console_formatter)
-
-# Create file handler to write logs to 'container_log.txt'
-file_handler = logging.FileHandler("container_log.txt", mode="a")
-file_handler.setLevel(logging.DEBUG)
-file_formatter = logging.Formatter(
-    "%(asctime)s %(levelname)s [%(name)s]: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-)
-file_handler.setFormatter(file_formatter)
-
-# Add both handlers to the logger
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
+from runpod.serverless.utils import download_files_from_urls, rp_cleanup, rp_debugger
+from runpod.serverless.utils.rp_validator import validate
+import runpod
+import predict
 
 
-
-
-MODEL = Predictor()
+MODEL = predict.Predictor()
 MODEL.setup()
 
-def cleanup_job_files(job_id, jobs_directory='/jobs'):
-    job_path = os.path.join(jobs_directory, job_id)
-    if os.path.exists(job_path):
-        try:
-            shutil.rmtree(job_path)
-            logger.info(f"Removed job directory: {job_path}")
-        except Exception as e:
-            logger.error(f"Error removing job directory {job_path}: {str(e)}", exc_info=True)
-    else:
-        logger.debug(f"Job directory not found: {job_path}")
 
-# --------------------------------------------------------------------
-# main serverless entry-point
-# --------------------------------------------------------------------
-error_log = []
-def run(job):
-    job_id     = job["id"]
-    job_input  = job["input"]
+def base64_to_tempfile(base64_file: str) -> str:
+    '''
+    Convert base64 file to tempfile.
 
-    # ------------- validate basic schema ----------------------------
-    validated = validate(job_input, INPUT_VALIDATIONS)
-    if "errors" in validated:
-        return {"error": validated["errors"]}
+    Parameters:
+    base64_file (str): Base64 file
 
-    # ------------- 1) download primary audio ------------------------
-    runpod.serverless.utils.rp_download.HEADERS = job_input.get("headers", runpod.serverless.utils.rp_download.HEADERS)
-    try:
-        audio_file_path = download_files_from_urls(job_id,
-                                                   [job_input["audio_file"]])[0]
-        logger.debug(f"Audio downloaded → {audio_file_path}")
-    except Exception as e:
-        logger.error("Audio download failed", exc_info=True)
-        return {"error": f"audio download: {e}"}
+    Returns:
+    str: Path to tempfile
+    '''
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+        temp_file.write(base64.b64decode(base64_file))
 
-    # ------------- 3) call WhisperX / VAD / diarization -------------
-    predict_input = {
-        "audio_file"               : audio_file_path,
-        "language"                 : job_input.get("language"),
-        "language_detection_min_prob": job_input.get("language_detection_min_prob", 0),
-        "language_detection_max_tries": job_input.get("language_detection_max_tries", 5),
-        "initial_prompt"           : job_input.get("initial_prompt"),
-        "batch_size"               : job_input.get("batch_size", 64),
-        "temperature"              : job_input.get("temperature", 0),
-        "vad_onset"                : job_input.get("vad_onset", 0.50),
-        "vad_offset"               : job_input.get("vad_offset", 0.363),
-        "align_output"             : job_input.get("align_output", False),
-        "diarization"              : job_input.get("diarization", False),
-        "huggingface_access_token" : job_input.get("huggingface_access_token"),
-        "min_speakers"             : job_input.get("min_speakers"),
-        "max_speakers"             : job_input.get("max_speakers"),
-        "debug"                    : job_input.get("debug", False),
-    }
+    return temp_file.name
 
-    try:
-        result = MODEL.predict(**predict_input)             # <-- heavy job
-    except Exception as e:
-        logger.error("WhisperX prediction failed", exc_info=True)
-        return {"error": f"prediction: {e}"}
 
-    output_dict = {
-        "segments"         : result.segments,
-        "language"         : result.detected_language,
-        "detected_language": result.detected_language
-    }
+@rp_debugger.FunctionTimer
+def run_whisper_job(job):
+    '''
+    Run inference on the model.
 
-    # 4-Cleanup and return output_dict normally
-    try:
-        rp_cleanup.clean(["input_objects"])
-        cleanup_job_files(job_id)
-    except Exception as e:
-        logger.warning(f"Cleanup issue: {e}", exc_info=True)
+    Parameters:
+    job (dict): Input job containing the model parameters
 
-    return output_dict
+    Returns:
+    dict: The result of the prediction
+    '''
+    job_input = job['input']
 
-runpod.serverless.start({"handler": run})
+    with rp_debugger.LineTimer('validation_step'):
+        input_validation = validate(job_input, INPUT_VALIDATIONS)
+
+        if 'errors' in input_validation:
+            return {"error": input_validation['errors']}
+        job_input = input_validation['validated_input']
+
+    if not job_input.get('audio', False) and not job_input.get('audio_base64', False):
+        return {'error': 'Must provide either audio or audio_base64'}
+
+    if job_input.get('audio', False) and job_input.get('audio_base64', False):
+        return {'error': 'Must provide either audio or audio_base64, not both'}
+
+    if job_input.get('audio', False):
+        with rp_debugger.LineTimer('download_step'):
+            audio_input = download_files_from_urls(job['id'], [job_input['audio']])[0]
+
+    if job_input.get('audio_base64', False):
+        audio_input = base64_to_tempfile(job_input['audio_base64'])
+
+    with rp_debugger.LineTimer('prediction_step'):
+        whisper_results = MODEL.predict(
+            audio=audio_input,
+            model_name=job_input["model"],
+            transcription=job_input["transcription"],
+            translation=job_input["translation"],
+            translate=job_input["translate"],
+            language=job_input["language"],
+            temperature=job_input["temperature"],
+            best_of=job_input["best_of"],
+            beam_size=job_input["beam_size"],
+            patience=job_input["patience"],
+            length_penalty=job_input["length_penalty"],
+            suppress_tokens=job_input.get("suppress_tokens", "-1"),
+            initial_prompt=job_input["initial_prompt"],
+            condition_on_previous_text=job_input["condition_on_previous_text"],
+            temperature_increment_on_fallback=job_input["temperature_increment_on_fallback"],
+            compression_ratio_threshold=job_input["compression_ratio_threshold"],
+            logprob_threshold=job_input["logprob_threshold"],
+            no_speech_threshold=job_input["no_speech_threshold"],
+            enable_vad=job_input["enable_vad"],
+            word_timestamps=job_input["word_timestamps"]
+        )
+
+    with rp_debugger.LineTimer('cleanup_step'):
+        rp_cleanup.clean(['input_objects'])
+
+    return whisper_results
+
+
+runpod.serverless.start({"handler": run_whisper_job})

@@ -1,10 +1,7 @@
-# ---------- PyTorch CUDA 12.1 wheels ----------
---extra-index-url https://download.pytorch.org/whl/cu121
-#torch==2.1.0+cu121
-#torchaudio==2.1.0+cu121
+runpod~=1.7.9
 
-# ---------- main libs ----------
-whisperx==3.7.4
+faster-whisper==1.1.0
+#whisperx==3.7.4
 #pyannote.audio==3.1.1                # embedded/diarization
 #speechbrain==0.5.16                  # ECAPA embedding that whisperx uses
 #ctranslate2==4.3.1                   # used by whisperx

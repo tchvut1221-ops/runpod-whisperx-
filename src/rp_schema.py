@@ -1,86 +1,107 @@
 INPUT_VALIDATIONS = {
-    'audio_file': {
+    'audio': {
         'type': str,
-        'required': True
+        'required': False,
+        'default': None
+    },
+    'audio_base64': {
+        'type': str,
+        'required': False,
+        'default': None
+    },
+    'model': {
+        'type': str,
+        'required': False,
+        'default': 'base'
+    },
+    'transcription': {
+        'type': str,
+        'required': False,
+        'default': 'plain_text'
+    },
+    'translate': {
+        'type': bool,
+        'required': False,
+        'default': False
+    },
+    'translation': {
+        'type': str,
+        'required': False,
+        'default': 'plain_text'
     },
     'language': {
         'type': str,
         'required': False,
         'default': None
     },
-    'language_detection_min_prob': {
+    'temperature': {
         'type': float,
         'required': False,
         'default': 0
     },
-    'language_detection_max_tries': {
+    'best_of': {
         'type': int,
         'required': False,
         'default': 5
+    },
+    'beam_size': {
+        'type': int,
+        'required': False,
+        'default': 5
+    },
+    'patience': {
+        'type': float,
+        'required': False,
+        'default': 1.0
+    },
+    'length_penalty': {
+        'type': float,
+        'required': False,
+        'default': 0
+    },
+    'suppress_tokens': {
+        'type': str,
+        'required': False,
+        'default': '-1'
     },
     'initial_prompt': {
         'type': str,
         'required': False,
         'default': None
     },
-    'batch_size': {
-        'type': int,
+    'condition_on_previous_text': {
+        'type': bool,
         'required': False,
-        'default': 64
+        'default': True
     },
-    'temperature': {
+    'temperature_increment_on_fallback': {
         'type': float,
         'required': False,
-        'default': 0
+        'default': 0.2
     },
-    'vad_onset': {
+    'compression_ratio_threshold': {
         'type': float,
         'required': False,
-        'default': 0.500
+        'default': 2.4
     },
-    'vad_offset': {
+    'logprob_threshold': {
         'type': float,
         'required': False,
-        'default': 0.363
+        'default': -1.0
     },
-    'align_output': {
+    'no_speech_threshold': {
+        'type': float,
+        'required': False,
+        'default': 0.6
+    },
+    'enable_vad': {
         'type': bool,
         'required': False,
         'default': False
     },
-    'diarization': {
+    'word_timestamps': {
         'type': bool,
         'required': False,
         'default': False
     },
-    'huggingface_access_token': {
-        'type': str,
-        'required': False,
-        'default': None
-    },
-    'min_speakers': {
-        'type': int,
-        'required': False,
-        'default': None
-    },
-    'max_speakers': {
-        'type': int,
-        'required': False,
-        'default': None
-    },
-    'debug': {
-        'type': bool,
-        'required': False,
-        'default': False
-    },
-    'speaker_verification': {
-        'type': bool,
-        'required': False,
-        'default': False
-    },
-    'speaker_samples': {
-        'type': list,
-        'required': False,
-        'default': []
-    }
 }
