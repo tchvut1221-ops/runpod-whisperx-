@@ -5,13 +5,8 @@ repository, with some modifications to make it work with the RP platform.
 """
 
 import gc
-import json
 
-import torch
 import threading
-from concurrent.futures import (
-    ThreadPoolExecutor,
-)  # Still needed for transcribe potentially?
 import numpy as np
 
 from runpod.serverless.utils import rp_cuda
@@ -30,7 +25,7 @@ AVAILABLE_MODELS = {
     "turbo",
 }
 
-is_cuda_available = torch.cuda.is_available()
+is_cuda_available = rp_cuda.is_available()
 device = "cuda" if is_cuda_available else "cpu"
 
 class Predictor:
