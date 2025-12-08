@@ -9,13 +9,10 @@ HF_TOKEN = os.getenv("HF_TOKEN")#
 
 ######SETTING HF_TOKENT#############
 
-from speaker_profiles import load_embeddings, relabel  # top of file
-from speaker_processing import identify_speakers_on_segments, load_known_speakers_from_samples, relabel_speakers_by_avg_similarity
 import logging
 from huggingface_hub import login, whoami
 import torch
 import numpy as np
-from dotenv import load_dotenv, find_dotenv
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -126,21 +123,6 @@ def run(job):
         logger.error("Audio download failed", exc_info=True)
         return {"error": f"audio download: {e}"}
 
-    # ------------- 2) download speaker profiles (optional) ----------
-    speaker_profiles = job_input.get("speaker_samples", [])
-    embeddings = {}
-    if speaker_profiles:
-        try:
-            embeddings = load_known_speakers_from_samples(
-                speaker_profiles,
-                huggingface_access_token=hf_token  # or job_input.get("huggingface_access_token")
-            )
-            logger.info(f"Enrolled {len(embeddings)} speaker profiles successfully.")
-        except Exception as e:
-            logger.error("Enrollment failed", exc_info=True)
-
-    # ----------------------------------------------------------------
-
     # ------------- 3) call WhisperX / VAD / diarization -------------
     predict_input = {
         "audio_file"               : audio_file_path,
@@ -171,25 +153,6 @@ def run(job):
         "language"         : result.detected_language,
         "detected_language": result.detected_language
     }
-    # ------------------------------------------------embedding-info----------------
-    # 4) speaker verification (optional)
-    if embeddings:
-        try:
-            segments_with_speakers = identify_speakers_on_segments(
-                segments=output_dict["segments"],
-                audio_path=audio_file_path,
-                enrolled=embeddings,
-                threshold=0.1  # Adjust threshold as needed
-            )
-            #output_dict["segments"] = segments_with_speakers
-            segments_with_final_labels = relabel_speakers_by_avg_similarity(segments_with_speakers)
-            output_dict["segments"] = segments_with_final_labels
-            logger.info("Speaker identification completed successfully.")
-        except Exception as e:
-            logger.error("Speaker identification failed", exc_info=True)
-            output_dict["warning"] = f"Speaker identification skipped: {e}"
-    else:
-        logger.info("No enrolled embeddings available; skipping speaker identification.")
 
     # 4-Cleanup and return output_dict normally
     try:
