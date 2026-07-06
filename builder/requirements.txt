@@ -1,0 +1,9 @@
+runpod
+faster-whisper
+torch
+librosa
+pyannote.audio
+speechbrain
+scipy
+numpy
+python-dotenv
