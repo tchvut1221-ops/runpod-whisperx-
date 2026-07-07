@@ -23,6 +23,10 @@ AVAILABLE_MODELS = {
     # "large-v2",
     "large-v3",
     "turbo",
+    # ivrit.ai Hebrew fine-tunes (CTranslate2 checkpoints, loadable directly
+    # by faster-whisper's WhisperModel via their HuggingFace repo id).
+    "ivrit-ai/whisper-large-v3-ct2",
+    "ivrit-ai/whisper-large-v3-turbo-ct2",
 }
 
 is_cuda_available = rp_cuda.is_available()
