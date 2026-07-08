@@ -13,6 +13,7 @@ from runpod.serverless.utils import download_files_from_urls, rp_cleanup, rp_deb
 from runpod.serverless.utils.rp_validator import validate
 import runpod
 import predict
+import diarization
 
 
 MODEL = predict.Predictor()
@@ -89,6 +90,12 @@ def run_whisper_job(job):
         enable_vad=job_input["enable_vad"],
         word_timestamps=job_input["word_timestamps"]
     )
+
+    if job_input.get("diarize"):
+        turns = diarization.diarize(audio_input)
+        whisper_results["segments"] = diarization.assign_speakers(
+            whisper_results["segments"], turns
+        )
 
     rp_cleanup.clean(['input_objects'])
 
