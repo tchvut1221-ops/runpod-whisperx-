@@ -24,7 +24,7 @@ def _get_pipeline():
                 hf_token = os.getenv("HUGGINGFACE_TOKEN")
                 _pipeline = Pipeline.from_pretrained(
                     "ivrit-ai/pyannote-speaker-diarization-3.1",
-                    use_auth_token=hf_token,
+                    token=hf_token,
                 )
     return _pipeline
 
